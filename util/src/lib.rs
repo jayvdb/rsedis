@@ -5,8 +5,9 @@ extern crate time;
 use std::fmt;
 
 use libc::types::os::arch::c95::c_int;
-use rand::{thread_rng, Rng};
-use time::get_time;
+use rand::{thread_rng, RngCore};
+use time::OffsetDateTime;
+
 
 /// Are two chars the same? Optionally ignoring the case.
 ///
@@ -163,8 +164,8 @@ pub fn glob_match(pattern: &[u8], element: &[u8], ignore_case: bool) -> bool {
 
 /// Current timestamp in microseconds
 pub fn ustime() -> i64 {
-    let tv = get_time();
-    tv.sec * 1000000 + (tv.nsec / 1000) as i64
+    let now = OffsetDateTime::now_utc();
+    (now.unix_timestamp_nanos() / 1_000).try_into().unwrap()
 }
 
 /// Current timestamp in milliseconds

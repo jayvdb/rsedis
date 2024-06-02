@@ -11,6 +11,8 @@ use std::process;
 use std::sync::mpsc::{channel, Sender};
 use std::thread;
 
+use syslog::{Formatter3164, LoggerBackend};
+
 /// Macro to log a message. Uses the `format!` syntax.
 /// See `std::fmt` for more information.
 ///
@@ -177,7 +179,7 @@ pub struct Logger {
         Option<Output>,
         Option<Level>,
         Option<String>,
-        Option<Option<Box<syslog::Logger>>>,
+        Option<Option<Box<syslog::Logger<LoggerBackend, Formatter3164>>>>,
         Option<i32>,
     )>,
 }
@@ -207,13 +209,13 @@ impl Logger {
             Option<Output>,
             Option<Level>,
             Option<String>,
-            Option<Option<Box<syslog::Logger>>>,
+            Option<Option<Box<syslog::Logger<LoggerBackend, Formatter3164>>>>,
             Option<i32>,
         )>();
         {
             let mut level = level;
             let mut output = output;
-            let mut syslog_writer: Option<Box<syslog::Logger>> = None;
+            let mut syslog_writer: Option<Box<syslog::Logger<LoggerBackend, Formatter3164>>> = None;
             thread::spawn(move || {
                 while let Ok((out, lvl, msg, syslog, code)) = rx.recv() {
                     match (out, lvl, msg, syslog) {
@@ -228,21 +230,15 @@ impl Logger {
                                     }
                                 };
                                 if let Some(ref mut w) = syslog_writer {
-                                    match w.send_3164(
-                                        match lvl {
-                                            Level::Debug => syslog::Severity::LOG_DEBUG,
-                                            Level::Verbose => syslog::Severity::LOG_INFO,
-                                            Level::Notice => syslog::Severity::LOG_NOTICE,
-                                            Level::Warning => syslog::Severity::LOG_WARNING,
-                                        },
-                                        msg.clone(),
-                                    ) {
-                                        Ok(_) => (),
-                                        Err(e) => {
-                                            // failing to log a message... will write straight to stderr
-                                            // if we cannot do that, we'll panic
-                                            eprint!("Failed to log {:?} {}", e, msg);
-                                        }
+                                    if let Err(e) = match lvl {
+                                        Level::Debug =>  w.debug(msg.clone()),
+                                        Level::Verbose => w.info(msg.clone()),
+                                        Level::Notice => w.notice(msg.clone()),
+                                        Level::Warning => w.warning(msg.clone()),
+                                    } {
+                                        // failing to log a message... will write straight to stderr
+                                        // if we cannot do that, we'll panic
+                                        eprint!("Failed to log {:?} {}", e, msg);
                                     }
                                 }
                             }
@@ -381,21 +377,26 @@ impl Logger {
     /// Enables syslog.
     #[cfg(unix)]
     pub fn set_syslog(&mut self, ident: &str, facility: &str) {
-        let mut w = syslog::unix(match &*facility.to_ascii_lowercase() {
-            "local0" => syslog::Facility::LOG_LOCAL0,
-            "local1" => syslog::Facility::LOG_LOCAL1,
-            "local2" => syslog::Facility::LOG_LOCAL2,
-            "local3" => syslog::Facility::LOG_LOCAL3,
-            "local4" => syslog::Facility::LOG_LOCAL4,
-            "local5" => syslog::Facility::LOG_LOCAL5,
-            "local6" => syslog::Facility::LOG_LOCAL6,
-            "local7" => syslog::Facility::LOG_LOCAL7,
-            _ => syslog::Facility::LOG_USER,
-        })
+        let formatter = Formatter3164 {
+            facility: match &*facility.to_ascii_lowercase() {
+                "local0" => syslog::Facility::LOG_LOCAL0,
+                "local1" => syslog::Facility::LOG_LOCAL1,
+                "local2" => syslog::Facility::LOG_LOCAL2,
+                "local3" => syslog::Facility::LOG_LOCAL3,
+                "local4" => syslog::Facility::LOG_LOCAL4,
+                "local5" => syslog::Facility::LOG_LOCAL5,
+                "local6" => syslog::Facility::LOG_LOCAL6,
+                "local7" => syslog::Facility::LOG_LOCAL7,
+                _ => syslog::Facility::LOG_USER,
+            },
+            hostname: None,
+            process: ident.to_owned(),
+            pid: std::process::id(),
+        };
+        let w = syslog::unix(formatter)
         .unwrap();
-        w.set_process_name(ident.to_owned());
         self.tx
-            .send((None, None, None, Some(Some(w)), None))
+            .send((None, None, None, Some(Some(Box::new(w))), None))
             .unwrap();
     }
 
