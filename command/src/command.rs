@@ -641,7 +641,7 @@ fn pfmerge(parser: &ParsedCommand, db: &mut Database, dbindex: usize) -> Respons
     let (val, r) = {
         let mut val = Value::Nil;
         if let Some(v) = db.get(dbindex, &key) {
-            try_validate!(val.set(try_validate!(v.get(), "ERR")), "ERR"); // FIXME unnecesary clone
+            try_validate!(val.set(try_validate!(v.get(), "ERR")), "ERR"); // FIXME unnecessary clone
         }
         let mut values = Vec::with_capacity(parser.argv.len() - 2);
         for i in 2..parser.argv.len() {

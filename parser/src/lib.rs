@@ -274,7 +274,7 @@ impl<'a> fmt::Debug for ParsedCommand<'a> {
     }
 }
 
-/// Parses the length of the paramenter in the slice
+/// Parses the length of the parameter in the slice
 /// Upon success, it returns a tuple with the length of the argument and the
 /// length of the parsed length.
 fn parse_int(input: &[u8], len: usize, name: &str) -> Result<(Option<usize>, usize), ParseError> {

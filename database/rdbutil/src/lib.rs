@@ -37,7 +37,7 @@ impl From<EncodeError> for io::Error {
 // But... I don't know how can it be specified that a generic can be compared
 // with hardcoded numbers (e.g.: -(1 << 7)) or what would happen with unsigned
 // numbers.
-// For now, the caller will have to explicitely cast or implement a wrapper function
+// For now, the caller will have to explicitly cast or implement a wrapper function
 pub fn encode_i64<W: io::Write>(value: i64, enc: &mut W) -> Result<(), EncodeError> {
     Ok(if value >= -(1 << 7) && value < 1 << 7 {
         enc.write_all(&[(ENCVAL << 6) | ENC_INT8, (value & 0xFF) as u8])
